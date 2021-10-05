@@ -1,21 +1,8 @@
 const std = @import("std");
 const protocol = @import("protocol.zig");
-const sodium = @import("sodium.zig");
+const crypto = @import("crypto.zig");
 
-// pub const CryptoStream = struct {
-//     secret_keys : sodium.SecretKeys,
-//     network : std.net.Stream,
-
-//     pub const Reader = std.io.Reader(*CryptoStream, anyerror, read);
-//     pub const Writer = std.io.Writer(*CryptoStream, anyerror, write);
-
-//     fn read(context: *CryptoStream, buffer: []u8) !usize{
-//         var len = try std.net.Stream.read(context, buffer);
-//         secret_keys.
-//     }
-// }
-
-pub fn authenticate(con: *std.net.StreamServer.Connection, long_term_key: sodium.KeyPair) !void {
+pub fn authenticate(con: *std.net.StreamServer.Connection, long_term_key: crypto.KeyPair) !void {
     var server_state = protocol.Server.initialize(long_term_key);
     var reader = con.stream.reader();
     var writer = con.stream.writer();
@@ -26,17 +13,71 @@ pub fn authenticate(con: *std.net.StreamServer.Connection, long_term_key: sodium
     try writer.writeAll(std.mem.asBytes(&challenge));
     var resp: protocol.ChallengeResponse = undefined;
     try reader.readNoEof(std.mem.asBytes(&resp));
-    try resp.handle(server_state);
-    // var secret_keys = server_state.generateKey();
+    try resp.completeAuth(server_state);
+    //var secret_keys = server_state.generateKey();
     // std.io.Reader()
 }
 
-pub fn main() anyerror!void {
-    try sodium.init();
+fn clientFn(host: []const u8, port: u16, server_pub_key: [crypto.KeyLength]u8, client_kp: crypto.KeyPair) !void {
+    var server_key = protocol.Client.ExpectedPublicKey{
+        .end_public_key = server_pub_key,
+        .middlebox_public_key = server_pub_key,
+    };
+    var con = try crypto.clientConnection(std.heap.page_allocator, host, port, client_kp, server_key);
+    std.log.debug("Connected, I'm {s} - other side {s} - expected {s}", .{
+        crypto.KeyPair.keyBase64(client_kp.public),
+        crypto.KeyPair.keyBase64(con.pub_key),
+        crypto.KeyPair.keyBase64(server_pub_key),
+    });
+    var encrypted_stream = con.stream;
+    defer encrypted_stream.deinit();
+    var buf: [1024]u8 = undefined;
+    var len = try encrypted_stream.reader().read(&buf);
+    std.log.debug("{s}", .{buf[0..len]});
+    _ = encrypted_stream.reader().read(&buf) catch |e| {
+        std.log.debug("err {s}", .{@errorName(e)});
+        var a = try encrypted_stream.alert();
+        std.log.debug("{s} {s} {s}", .{ @errorName(e), @tagName(a.alert), a.msg });
+    };
+}
 
-    var state : c.crypto_secretstream_xchacha20poly1305_state = undefined;
-    var key : [c.crypto_secretstream_xchacha20poly1305_KEYBYTES]u8 = undefined;
-    var header :
+pub fn main() anyerror!void {
+    try crypto.init();
+
+    var server_kp = crypto.KeyPair.init();
+    var client_kp = crypto.KeyPair.init();
+
+    var server = std.net.StreamServer.init(.{});
+    defer server.deinit();
+
+    const localhost = try std.net.Address.parseIp("127.0.0.1", 0);
+
+    try server.listen(localhost);
+
+    const t = try std.Thread.spawn(.{}, clientFn, .{
+        "127.0.0.1",
+        server.listen_address.getPort(),
+        server_kp.public,
+        client_kp,
+    });
+
+    var client = try server.accept();
+
+    defer t.join();
+
+    var con = try crypto.serverConnection(std.heap.page_allocator, client.stream, server_kp);
+    std.log.debug("Connected, I'm {s} - other side {s}", .{
+        crypto.KeyPair.keyBase64(server_kp.public),
+        crypto.KeyPair.keyBase64(con.pub_key),
+    });
+    var encrypted_stream = con.stream;
+    defer encrypted_stream.deinit();
+    var w = encrypted_stream.writer();
+    try w.writeAll("hi there");
+    try encrypted_stream.flush();
+
+    var msg = "Opps, msg".*;
+    try encrypted_stream.send_alert(crypto.AlertTypes.Badness, &msg);
 
     // var sltk = sodium.KeyPair.init();
     // var b64 = sltk.base64();
