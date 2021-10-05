@@ -145,6 +145,7 @@ pub fn Stream(comptime TStream: type) type {
                 }
                 std.mem.writeInt(u16, encrypted[0..2], @intCast(u16, len + @sizeOf(u16)), .Little);
                 try self.writer.writeAll(encrypted[0 .. len + @sizeOf(u16)]);
+                self.buffered = HeaderSize;
             }
 
             pub fn send_alert(self: *CryptoWriter, alert_type: AlertTypes, msg: []u8) !void {
@@ -200,7 +201,7 @@ pub fn Stream(comptime TStream: type) type {
             state: c.crypto_secretstream_xchacha20poly1305_state,
             alert_code: ?AlertTypes,
 
-            pub fn init(allocator: *std.mem.Allocator, source: TStream.Reader, secret_keys:  sodium.SecretKeys) !CryptoReader {
+            pub fn init(allocator: *std.mem.Allocator, source: TStream.Reader, secret_keys: sodium.SecretKeys) !CryptoReader {
                 var buf = try allocator.alloc(u8, RecordBufferSize * 2);
                 errdefer allocator.free(buf);
                 var self: CryptoReader = .{

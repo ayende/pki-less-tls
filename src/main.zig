@@ -2,21 +2,7 @@ const std = @import("std");
 const protocol = @import("protocol.zig");
 const crypto = @import("crypto.zig");
 
-pub fn authenticate(con: *std.net.StreamServer.Connection, long_term_key: crypto.KeyPair) !void {
-    var server_state = protocol.Server.initialize(long_term_key);
-    var reader = con.stream.reader();
-    var writer = con.stream.writer();
-    var hello: protocol.HelloMessage = undefined;
-    try reader.readNoEof(std.mem.asBytes(&hello));
-    try hello.route(server_state);
-    var challenge = try hello.challenge(server_state);
-    try writer.writeAll(std.mem.asBytes(&challenge));
-    var resp: protocol.ChallengeResponse = undefined;
-    try reader.readNoEof(std.mem.asBytes(&resp));
-    try resp.completeAuth(server_state);
-    //var secret_keys = server_state.generateKey();
-    // std.io.Reader()
-}
+
 
 fn clientFn(host: []const u8, port: u16, server_pub_key: [crypto.KeyLength]u8, client_kp: crypto.KeyPair) !void {
     var server_key = protocol.Client.ExpectedPublicKey{
