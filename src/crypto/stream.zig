@@ -183,6 +183,7 @@ pub fn Stream(comptime TStream: type) type {
             }
 
             pub fn deinit(self: *CryptoWriter) void {
+                std.mem.set(u8, self.buffer, 0);
                 self.allocator.free(self.buffer);
             }
         };
@@ -232,6 +233,7 @@ pub fn Stream(comptime TStream: type) type {
             }
 
             pub fn deinit(self: *CryptoReader) void {
+                std.mem.set(u8, self.buffer, 0);
                 self.allocator.free(self.buffer);
             }
 
