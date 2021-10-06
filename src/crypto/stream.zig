@@ -7,7 +7,10 @@ const c = @cImport({
 const RecordBufferSize = 1024 * 16;
 const RecordTypes = enum(u8) { Data = 0, Alert = 1 };
 
-pub const AlertTypes = enum(u16) { Badness = 1 };
+pub const AlertTypes = enum(u16) {
+    Badness = 1,
+    BadChallengeResponse = 2,
+};
 
 pub fn Stream(comptime TStream: type) type {
     return struct {

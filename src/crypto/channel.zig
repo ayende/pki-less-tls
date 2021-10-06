@@ -56,12 +56,20 @@ pub fn serverConnection(allocator: *std.mem.Allocator, stream: std.net.Stream, s
     var resp: protocol.ChallengeResponse = undefined;
     try reader.readNoEof(std.mem.asBytes(&resp));
 
-    try resp.completeAuth(&handshake);
-
+    // we now have enough to create secured communication channel
     var session = try handshake.generateKey();
-
     var rc: AuthenticatedConnection = undefined;
     std.mem.copy(u8, &rc.pub_key, &handshake.client.long_term_public_key);
     rc.stream = try crypto.NetworkStream.init(allocator, stream, session);
+
+    resp.completeAuth(&handshake) catch |e| {
+        // we use the secure channel to send an error to the other side (will also abort the connection there)
+        var msg = "Failed to validate challenge response".*;
+        rc.stream.send_alert(crypto.AlertTypes.BadChallengeResponse, &msg) catch {
+            // there is nothing we can do here, ignoring the error
+        };
+        return e; // implicitly close the connection
+    };
+
     return rc;
 }

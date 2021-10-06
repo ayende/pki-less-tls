@@ -1,12 +1,12 @@
 const std = @import("std");
-const stream = @import("crypto/stream.zig");
+const encrypted = @import("crypto/stream.zig");
 const sodium = @import("crypto/sodium.zig");
 const channel = @import("crypto/channel.zig");
 
-pub const NetworkStream = stream.Stream(std.net.Stream);
+pub const NetworkStream = encrypted.Stream(std.net.Stream);
 pub const KeyPair = sodium.KeyPair;
 pub const SecretKeys = sodium.SecretKeys;
-pub const AlertTypes = stream.AlertTypes;
+pub const AlertTypes = encrypted.AlertTypes;
 pub const KeyLength = sodium.KeyLen;
 pub const EncryptedBoxKey = sodium.EncryptedBoxBuffer(sodium.KeyLen);
 
